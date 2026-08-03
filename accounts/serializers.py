@@ -19,3 +19,8 @@ class UserSerializer(serializers.ModelSerializer):
             "emergency_phone",
         )
         read_only_fields = ("id", "username", "role", "role_display")
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "phone", "emergency_phone")
