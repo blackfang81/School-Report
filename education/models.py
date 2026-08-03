@@ -41,3 +41,23 @@ class Term(models.Model):
             overlap = overlap.exclude(pk=self.pk)
         if overlap.exists():
             raise ValidationError("Term date range overlaps with another term.")
+
+
+class ClassRoom(models.Model):
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="classes")
+    term = models.ForeignKey(Term, on_delete=models.PROTECT, related_name="classes")
+    name = models.CharField(max_length=200)
+    class_type = models.CharField(max_length=50, blank=True)
+    session_duration = models.IntegerField(choices=SessionDuration.choices)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    class Meta:
+        ordering = ["-start_date"]
+
+    def __str__(self):
+        return f"{self.name} ({self.school.name})"
+
+    def clean(self):
+        if self.end_date < self.start_date:
+            raise ValidationError("Class end date cannot be before start date.")
