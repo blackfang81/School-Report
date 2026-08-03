@@ -16,3 +16,28 @@ class SchoolSerializer(serializers.ModelSerializer):
             "fax",
             "address",
         )
+
+
+class TermSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Term
+        fields = ("id", "name", "start_date", "end_date", "is_summer")
+
+    def validate(self, attrs):
+        start = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if start and end and end < start:
+            raise serializers.ValidationError("End date cannot be before start date.")
+
+        instance = self.instance or Term(
+            **{k: v for k, v in attrs.items() if k in ("start_date", "end_date", "name", "is_summer")}
+        )
+        if self.instance:
+            for key, value in attrs.items():
+                setattr(instance, key, value)
+        try:
+            instance.full_clean()
+        except Exception as exc:
+            raise serializers.ValidationError(exc.messages if hasattr(exc, "messages") else str(exc)) from exc
+        return attrs
+
