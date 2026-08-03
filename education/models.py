@@ -1,7 +1,16 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
-# Create your models here.
+from accounts.models import Role, User
+
+
+class SessionDuration(models.IntegerChoices):
+    MIN_60 = 60, "60 minutes"
+    MIN_90 = 90, "90 minutes"
+    MIN_120 = 120, "120 minutes"
+
+
 class School(models.Model):
     name = models.CharField(max_length=200)
     level = models.CharField(max_length=50, blank=True)
