@@ -31,3 +31,13 @@ class MeView(generics.RetrieveUpdateAPIView):
         serializer.save()
         return Response(UserSerializer(self.get_object()).data)
 
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
+
