@@ -58,3 +58,10 @@ class RoleCheckView(APIView):
             }
         )
 
+
+class TeacherListView(generics.ListAPIView):
+    permission_classes = [IsEducationOfficer]
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        return User.objects.filter(role=Role.TEACHER, is_active=True).order_by("username")
