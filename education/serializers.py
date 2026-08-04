@@ -41,3 +41,32 @@ class TermSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc.messages if hasattr(exc, "messages") else str(exc)) from exc
         return attrs
 
+
+class ClassRoomSerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(source="school.name", read_only=True)
+    term_name = serializers.CharField(source="term.name", read_only=True)
+    session_duration_display = serializers.CharField(
+        source="get_session_duration_display", read_only=True
+    )
+
+    class Meta:
+        model = ClassRoom
+        fields = (
+            "id",
+            "school",
+            "school_name",
+            "term",
+            "term_name",
+            "name",
+            "class_type",
+            "session_duration",
+            "session_duration_display",
+            "start_date",
+            "end_date",
+        )
+
+    def validate_session_duration(self, value):
+        if value not in (60, 90, 120):
+            raise serializers.ValidationError("Session duration must be 60, 90, or 120 minutes.")
+        return value
+
