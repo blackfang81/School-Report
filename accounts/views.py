@@ -41,3 +41,20 @@ class ChangePasswordView(APIView):
         serializer.save()
         return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
 
+
+class RoleCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response(
+            {
+                "username": user.username,
+                "role": user.role,
+                "role_display": user.get_role_display(),
+                "is_teacher": user.is_teacher,
+                "is_education_officer": user.is_education_officer,
+                "is_finance_officer": user.is_finance_officer,
+            }
+        )
+
