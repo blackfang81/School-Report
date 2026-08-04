@@ -70,3 +70,26 @@ class ClassRoomSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Session duration must be 60, 90, or 120 minutes.")
         return value
 
+
+class TeacherAssignmentSerializer(serializers.ModelSerializer):
+    teacher_name = serializers.CharField(source="teacher.get_full_name", read_only=True)
+    classroom_name = serializers.CharField(source="classroom.name", read_only=True)
+
+    class Meta:
+        model = TeacherAssignment
+        fields = (
+            "id",
+            "classroom",
+            "classroom_name",
+            "teacher",
+            "teacher_name",
+            "start_date",
+            "end_date",
+        )
+
+    def validate(self, attrs):
+        start = attrs.get("start_date")
+        end = attrs.get("end_date")
+        if start and end and end < start:
+            raise serializers.ValidationError("End date cannot be before start date.")
+        return attrs
