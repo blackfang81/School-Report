@@ -65,3 +65,31 @@ class ClassRoomViewSet(viewsets.ModelViewSet):
                 assignments__teacher=user,
             ).distinct()
         return qs
+
+
+class TeacherAssignmentViewSet(viewsets.ModelViewSet):
+    serializer_class = TeacherAssignmentSerializer
+    filterset_fields = ["classroom", "teacher"]
+    ordering_fields = ["start_date"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsEducationOfficer()]
+
+    def get_queryset(self):
+        qs = TeacherAssignment.objects.select_related("teacher", "classroom")
+        user = self.request.user
+        if user.is_teacher:
+            return qs.filter(teacher=user)
+        return qs
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        obj.full_clean()
+        obj.save()
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        obj.full_clean()
+        obj.save()
