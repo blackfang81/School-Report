@@ -22,3 +22,26 @@ class SchoolViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return [IsAuthenticated()]
         return [IsEducationOfficer()]
+
+
+class TermViewSet(viewsets.ModelViewSet):
+    queryset = Term.objects.all()
+    serializer_class = TermSerializer
+    filterset_fields = ["is_summer", "name"]
+    ordering_fields = ["start_date", "name"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsEducationOfficer()]
+
+    def perform_create(self, serializer):
+        term = serializer.save()
+        term.full_clean()
+        term.save()
+
+    def perform_update(self, serializer):
+        term = serializer.save()
+        term.full_clean()
+        term.save()
+
