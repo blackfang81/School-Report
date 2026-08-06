@@ -7,7 +7,7 @@
 ## Setup
 
 ```bash
-cd "Maktab final project"
+cd "School_Report"
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
