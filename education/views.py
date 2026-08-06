@@ -45,3 +45,23 @@ class TermViewSet(viewsets.ModelViewSet):
         term.full_clean()
         term.save()
 
+
+class ClassRoomViewSet(viewsets.ModelViewSet):
+    serializer_class = ClassRoomSerializer
+    filterset_fields = ["school", "term", "class_type", "session_duration"]
+    search_fields = ["name"]
+    ordering_fields = ["start_date", "name"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsEducationOfficer()]
+
+    def get_queryset(self):
+        qs = ClassRoom.objects.select_related("school", "term")
+        user = self.request.user
+        if user.is_teacher:
+            return qs.filter(
+                assignments__teacher=user,
+            ).distinct()
+        return qs
