@@ -2,7 +2,6 @@ from django.core.management.base import BaseCommand
 
 from accounts.models import Role, User
 from education.models import ClassRoom, School, TeacherAssignment, Term
-from finance.models import TermBaseRate
 
 
 class Command(BaseCommand):
@@ -60,7 +59,6 @@ class Command(BaseCommand):
             teacher=User.objects.get(username="teacher1"),
             start_date="2025-09-01",
         )
-        TermBaseRate.objects.create(term=term, base_rate=200_000)
 
         self.stdout.write(self.style.SUCCESS("Sample data created."))
         self.stdout.write("teacher1 / pass12345")
