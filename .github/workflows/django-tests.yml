@@ -8,10 +8,34 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: School_Report
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      - uses: actions/setup-python@v5
+    env:
+      DB_NAME: School_Report
+      DB_USER: postgres
+      DB_PASSWORD: 1
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -23,5 +47,5 @@ jobs:
       - name: Run migrations
         run: python manage.py migrate
 
-      - name: Run all tests
+      - name: Run tests
         run: python manage.py test
