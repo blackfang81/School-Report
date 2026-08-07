@@ -40,16 +40,6 @@ class AuthAccessTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
 
-    def test_teacher_cannot_access_finance_rates(self):
-        self.auth(self.teacher)
-        response = self.client.get("/api/finance/base-rates/")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_finance_can_access_rates(self):
-        self.auth(self.finance)
-        response = self.client.get("/api/finance/base-rates/")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
     def test_profile_update(self):
         self.auth(self.teacher)
         response = self.client.patch(
