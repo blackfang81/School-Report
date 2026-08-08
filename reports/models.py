@@ -57,3 +57,21 @@ class SessionReport(models.Model):
         ).filter(
             models.Q(end_date__isnull=True) | models.Q(end_date__gte=session_date)
         ).exists()
+
+    def mark_approved(self):
+        now = timezone.now()
+        self.status = ReportStatus.APPROVED
+        self.approved_at = now
+        self.is_salary_eligible = is_salary_eligible(self.session_date, now)
+        self.save(
+            update_fields=["status", "approved_at", "is_salary_eligible", "updated_at"]
+        )
+
+    def mark_rejected(self, note=""):
+        self.status = ReportStatus.REJECTED
+        self.officer_note = note
+        self.approved_at = None
+        self.is_salary_eligible = False
+        self.save(
+            update_fields=["status", "officer_note", "approved_at", "is_salary_eligible", "updated_at"]
+        )
