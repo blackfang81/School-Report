@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Reporting System</title>
+  <link rel="stylesheet" href="{% static 'frontend/css/style.css' %}">
+</head>
+<body>
+  <section id="login-screen">
+    <div class="login-card">
+      <h1>Class Reporting System</h1>
+      <p>Login with your username and password.</p>
+      <div id="global-alert"></div>
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input id="username" name="username" required>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+        <button type="submit">Login</button>
+      </form>
+      <p style="font-size: 13px; color: #666; margin-top: 16px;">
+        Sample users: teacher1 / officer1 / finance1 — password: pass12345
+      </p>
+    </div>
+  </section>
+
+  <section id="app-screen" class="hidden">
+    <header>
+      <strong>Class Reporting System</strong>
+      <div class="user-info">
+        <span id="user-label"></span>
+        <button id="logout-btn" class="secondary">Logout</button>
+      </div>
+    </header>
+    <div class="layout">
+      <nav id="nav-menu"></nav>
+      <main>
+        <h2 id="page-title"></h2>
+        <div id="page-content"></div>
+      </main>
+    </div>
+  </section>
+
+  <script src="{% static 'frontend/js/api.js' %}"></script>
+  <script src="{% static 'frontend/js/app.js' %}"></script>
+</body>
+</html>
