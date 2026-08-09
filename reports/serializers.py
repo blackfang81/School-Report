@@ -45,3 +45,29 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "school_name",
         )
 
+
+class SessionReportCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionReport
+        fields = (
+            "classroom",
+            "session_date",
+            "summary",
+            "present_count",
+            "absent_count",
+        )
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        teacher = request.user
+        classroom = attrs["classroom"]
+        session_date = attrs["session_date"]
+
+        if not SessionReport.teacher_owns_class_on_date(teacher, classroom, session_date):
+            raise serializers.ValidationError("You are not assigned to this class on the selected date.")
+
+        if attrs["present_count"] + attrs["absent_count"] == 0:
+            raise serializers.ValidationError("Present and absent counts must add up to more than zero.")
+
+        return attrs
+
