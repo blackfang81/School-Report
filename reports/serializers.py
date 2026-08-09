@@ -71,3 +71,36 @@ class SessionReportCreateSerializer(serializers.ModelSerializer):
 
         return attrs
 
+
+class SessionReportUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionReport
+        fields = (
+            "session_date",
+            "summary",
+            "present_count",
+            "absent_count",
+        )
+
+    def validate(self, attrs):
+        instance = self.instance
+        if instance.status == ReportStatus.APPROVED:
+            raise serializers.ValidationError("Approved reports cannot be edited.")
+
+        teacher = self.context["request"].user
+        session_date = attrs.get("session_date", instance.session_date)
+        classroom = instance.classroom
+
+        if not SessionReport.teacher_owns_class_on_date(teacher, classroom, session_date):
+            raise serializers.ValidationError("You are not assigned to this class on the selected date.")
+
+        present = attrs.get("present_count", instance.present_count)
+        absent = attrs.get("absent_count", instance.absent_count)
+        if present + absent == 0:
+            raise serializers.ValidationError("Present and absent counts must add up to more than zero.")
+
+        return attrs
+
+
+class ReportReviewSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True, default="")
