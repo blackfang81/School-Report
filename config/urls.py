@@ -11,14 +11,21 @@ from accounts.views import (
     TeacherListView,
 )
 from education.views import ClassRoomViewSet, SchoolViewSet, TeacherAssignmentViewSet, TermViewSet
+from finance.views import CalculateSalariesView, SalaryViewSet, TermBaseRateViewSet
+from frontend.views import IndexView
+from reports.views import SessionReportViewSet
 
 router = DefaultRouter()
 router.register("schools", SchoolViewSet, basename="school")
 router.register("terms", TermViewSet, basename="term")
 router.register("classes", ClassRoomViewSet, basename="class")
 router.register("teacher-assignments", TeacherAssignmentViewSet, basename="teacher-assignment")
+router.register("reports", SessionReportViewSet, basename="report")
+router.register("finance/base-rates", TermBaseRateViewSet, basename="base-rate")
+router.register("finance/salaries", SalaryViewSet, basename="salary")
 
 urlpatterns = [
+    path("", IndexView.as_view(), name="home"),
     path("admin/", admin.site.urls),
     path("api/auth/login/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
@@ -26,5 +33,6 @@ urlpatterns = [
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("api/auth/role/", RoleCheckView.as_view(), name="role_check"),
     path("api/auth/teachers/", TeacherListView.as_view(), name="teacher_list"),
+    path("api/finance/salaries/calculate/", CalculateSalariesView.as_view(), name="calculate_salaries"),
     path("api/", include(router.urls)),
 ]
