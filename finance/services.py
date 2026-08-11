@@ -8,6 +8,12 @@ from reports.models import ReportStatus, SessionReport
 
 
 def calculate_teacher_salary(teacher, year: int, month: int):
+    """
+    Calculate a teacher's salary for a Gregorian calendar month.
+
+    Returns ``None`` when the teacher has no approved eligible reports,
+    has pending/rejected reports in the month, or lacks a base rate for a term.
+    """
     start, end = calendar_month_range(year, month)
     reports = SessionReport.objects.filter(
         teacher=teacher,
@@ -53,6 +59,12 @@ def calculate_teacher_salary(teacher, year: int, month: int):
 
 
 def calculate_monthly_salaries(year: int, month: int):
+    """
+    Calculate and persist salary records for all active teachers in a month.
+
+    Removes stale records when a teacher no longer qualifies.
+    Returns the list of created/updated ``SalaryRecord`` instances.
+    """
     teachers = User.objects.filter(role=Role.TEACHER, is_active=True)
     created = []
     for teacher in teachers:

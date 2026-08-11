@@ -1,7 +1,9 @@
 from django.db import models
 
+from config.mixins import SoftDeleteModel
 
-class TermBaseRate(models.Model):
+
+class TermBaseRate(SoftDeleteModel):
     term = models.OneToOneField("education.Term", on_delete=models.CASCADE, related_name="base_rate")
     base_rate = models.DecimalField(max_digits=12, decimal_places=0)
 

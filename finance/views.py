@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsFinanceOfficer, IsTeacher
+from config.viewsets import SoftDeleteModelViewSetMixin
 from finance.models import SalaryRecord, TermBaseRate
 from finance.services import calculate_monthly_salaries
 
@@ -13,7 +14,8 @@ class TermBaseRateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TermBaseRate
-        fields = ("id", "term", "term_name", "base_rate")
+        fields = ("id", "term", "term_name", "base_rate", "is_deleted", "deleted_at")
+        read_only_fields = ("is_deleted", "deleted_at")
 
 
 class SalaryRecordSerializer(serializers.ModelSerializer):
@@ -38,8 +40,14 @@ class CalculateSalarySerializer(serializers.Serializer):
     month = serializers.IntegerField(min_value=1, max_value=12)
 
 
-class TermBaseRateViewSet(viewsets.ModelViewSet):
-    queryset = TermBaseRate.objects.select_related("term")
+class TermBaseRateViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for per-term base salary rates.
+
+    Finance officers manage rates; DELETE performs a soft delete.
+    """
+
+    queryset = TermBaseRate.objects.select_related("term").order_by("id")
     serializer_class = TermBaseRateSerializer
     permission_classes = [IsFinanceOfficer]
 
