@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "django_filters",
+    "drf_spectacular",
     "accounts",
     "education",
     "reports",
@@ -104,10 +105,31 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "School Report API",
+    "DESCRIPTION": (
+        "Class reporting and teacher salary system. "
+        "Full documentation: docs/API.md — "
+        "Roles: teacher, education_officer, finance_officer. "
+        "JWT auth via /api/auth/login/. Soft delete on education, report, and base-rate models."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "TAGS": [
+        {"name": "auth", "description": "Authentication and user management"},
+        {"name": "education", "description": "Schools, terms, classes, assignments"},
+        {"name": "reports", "description": "Session report workflow"},
+        {"name": "finance", "description": "Base rates and salary calculation"},
+    ],
 }
 
 SIMPLE_JWT = {
