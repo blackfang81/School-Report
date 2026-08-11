@@ -1,9 +1,11 @@
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.views import (
+    AdminCreateUserView,
     ChangePasswordView,
     CustomTokenObtainPairView,
     MeView,
@@ -33,6 +35,9 @@ urlpatterns = [
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("api/auth/role/", RoleCheckView.as_view(), name="role_check"),
     path("api/auth/teachers/", TeacherListView.as_view(), name="teacher_list"),
+    path("api/auth/users/", AdminCreateUserView.as_view(), name="admin_create_user"),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/finance/salaries/calculate/", CalculateSalariesView.as_view(), name="calculate_salaries"),
     path("api/", include(router.urls)),
 ]
