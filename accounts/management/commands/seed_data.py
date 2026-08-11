@@ -1,3 +1,5 @@
+"""Seed the database with sample users and education data."""
+
 from django.core.management.base import BaseCommand
 
 from accounts.models import Role, User
@@ -5,6 +7,8 @@ from education.models import ClassRoom, School, TeacherAssignment, Term
 
 
 class Command(BaseCommand):
+    """Create default users, a school, term, class, and teacher assignment."""
+
     help = "Create sample data for testing the system"
 
     def handle(self, *args, **options):
@@ -37,6 +41,16 @@ class Command(BaseCommand):
             last_name="Karimi",
             phone="09120000004",
         )
+        User.objects.create_user(
+            username="admin1",
+            password="pass12345",
+            role=Role.EDUCATION_OFFICER,
+            first_name="Admin",
+            last_name="User",
+            phone="09120000005",
+            is_staff=True,
+            is_superuser=True,
+        )
 
         school = School.objects.create(name="Sample School", phone="02112345678", address="Tehran")
         term = Term.objects.create(
@@ -64,3 +78,4 @@ class Command(BaseCommand):
         self.stdout.write("teacher1 / pass12345")
         self.stdout.write("officer1 / pass12345")
         self.stdout.write("finance1 / pass12345")
+        self.stdout.write("admin1 / pass12345 (Django admin + staff API)")
