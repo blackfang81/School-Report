@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import IsEducationOfficer, IsTeacher
+from config.viewsets import SoftDeleteModelViewSetMixin
 from reports.models import ReportStatus, SessionReport
 from reports.serializers import (
     ReportReviewSerializer,
@@ -13,16 +14,25 @@ from reports.serializers import (
 )
 
 
-class SessionReportViewSet(viewsets.ModelViewSet):
+class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for class session reports with soft delete.
+
+    Teachers create and edit their own pending/rejected reports.
+    Education officers approve, reject, or soft-delete any report.
+    Teachers may soft-delete only their own pending reports.
+    """
+
     filterset_fields = ["classroom", "teacher", "status", "classroom__school"]
     ordering_fields = ["session_date", "submitted_at", "session_number"]
-    http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update"):
             return [IsTeacher()]
         if self.action in ("approve", "reject"):
             return [IsEducationOfficer()]
+        if self.action == "destroy":
+            return [IsAuthenticated()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -92,13 +102,23 @@ class SessionReportViewSet(viewsets.ModelViewSet):
         return Response(SessionReportSerializer(instance).data)
 
     def destroy(self, request, *args, **kwargs):
+        report = self.get_object()
+        user = request.user
+
+        if user.is_education_officer:
+            return super().destroy(request, *args, **kwargs)
+
+        if user.is_teacher and report.teacher_id == user.id and report.status == ReportStatus.PENDING:
+            return super().destroy(request, *args, **kwargs)
+
         return Response(
-            {"detail": "Deleting reports is not allowed."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+            {"detail": "You cannot delete this report."},
+            status=status.HTTP_403_FORBIDDEN,
         )
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
+        """Approve a pending report; sets salary eligibility based on 48-hour deadline."""
         report = self.get_object()
         serializer = ReportReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -108,6 +128,7 @@ class SessionReportViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
+        """Reject a report with an optional officer note."""
         report = self.get_object()
         serializer = ReportReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

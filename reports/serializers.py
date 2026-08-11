@@ -29,6 +29,8 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "submitted_at",
             "approved_at",
             "is_salary_eligible",
+            "is_deleted",
+            "deleted_at",
         )
         read_only_fields = (
             "id",
@@ -40,6 +42,8 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "submitted_at",
             "approved_at",
             "is_salary_eligible",
+            "is_deleted",
+            "deleted_at",
             "teacher_name",
             "classroom_name",
             "school_name",

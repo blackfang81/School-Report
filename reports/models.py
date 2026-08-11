@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from config.datetime_utils import is_salary_eligible
+from config.mixins import SoftDeleteModel
 from education.models import ClassRoom, TeacherAssignment
 
 
@@ -12,7 +13,7 @@ class ReportStatus(models.TextChoices):
     REJECTED = "rejected", "Rejected"
 
 
-class SessionReport(models.Model):
+class SessionReport(SoftDeleteModel):
     classroom = models.ForeignKey(ClassRoom, on_delete=models.PROTECT, related_name="reports")
     teacher = models.ForeignKey(
         User,
@@ -38,7 +39,13 @@ class SessionReport(models.Model):
 
     class Meta:
         ordering = ["-session_date", "-session_number"]
-        unique_together = ("classroom", "session_number")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["classroom", "session_number"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_session_number_per_classroom",
+            )
+        ]
 
     def __str__(self):
         return f"Session {self.session_number} - {self.classroom.name}"
