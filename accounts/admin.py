@@ -6,8 +6,10 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("username", "first_name", "last_name", "role", "phone", "is_active")
-    list_filter = ("role", "is_active")
+    """Django admin configuration for custom User model."""
+
+    list_display = ("username", "first_name", "last_name", "role", "phone", "is_staff", "is_active")
+    list_filter = ("role", "is_staff", "is_active")
     fieldsets = BaseUserAdmin.fieldsets + (
         ("Extra", {"fields": ("role", "phone", "emergency_phone")}),
     )
