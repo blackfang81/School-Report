@@ -1,9 +1,13 @@
+"""API viewsets for education resources."""
+
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from accounts.permissions import IsEducationOfficer, IsTeacher
-from .models import ClassRoom, School, TeacherAssignment, Term
-from .serializers import (
+from accounts.permissions import IsEducationOfficer
+from config.viewsets import SoftDeleteModelViewSetMixin
+from education.filters import ClassRoomFilter, TeacherAssignmentFilter
+from education.models import ClassRoom, School, TeacherAssignment, Term
+from education.serializers import (
     ClassRoomSerializer,
     SchoolSerializer,
     TeacherAssignmentSerializer,
@@ -11,7 +15,13 @@ from .serializers import (
 )
 
 
-class SchoolViewSet(viewsets.ModelViewSet):
+class SchoolViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for schools.
+
+    Education officers can create/update/delete; all authenticated users can list/retrieve.
+    """
+
     queryset = School.objects.all()
     serializer_class = SchoolSerializer
     filterset_fields = ["name", "level", "gender"]
@@ -24,7 +34,13 @@ class SchoolViewSet(viewsets.ModelViewSet):
         return [IsEducationOfficer()]
 
 
-class TermViewSet(viewsets.ModelViewSet):
+class TermViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for academic terms.
+
+    Validates non-overlapping date ranges on create/update.
+    """
+
     queryset = Term.objects.all()
     serializer_class = TermSerializer
     filterset_fields = ["is_summer", "name"]
@@ -35,20 +51,16 @@ class TermViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated()]
         return [IsEducationOfficer()]
 
-    def perform_create(self, serializer):
-        term = serializer.save()
-        term.full_clean()
-        term.save()
 
-    def perform_update(self, serializer):
-        term = serializer.save()
-        term.full_clean()
-        term.save()
+class ClassRoomViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for classes.
 
+    Teachers only see classes they are (or were) assigned to.
+    """
 
-class ClassRoomViewSet(viewsets.ModelViewSet):
     serializer_class = ClassRoomSerializer
-    filterset_fields = ["school", "term", "class_type", "session_duration"]
+    filterset_class = ClassRoomFilter
     search_fields = ["name"]
     ordering_fields = ["start_date", "name"]
 
@@ -58,18 +70,24 @@ class ClassRoomViewSet(viewsets.ModelViewSet):
         return [IsEducationOfficer()]
 
     def get_queryset(self):
-        qs = ClassRoom.objects.select_related("school", "term")
+        qs = ClassRoom.objects.select_related("school", "term").prefetch_related(
+            "assignments__teacher"
+        )
         user = self.request.user
         if user.is_teacher:
-            return qs.filter(
-                assignments__teacher=user,
-            ).distinct()
+            return qs.filter(assignments__teacher=user).distinct()
         return qs
 
 
-class TeacherAssignmentViewSet(viewsets.ModelViewSet):
+class TeacherAssignmentViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
+    """
+    CRUD for teacher-class assignments.
+
+    Supports sequential multi-teacher assignments without date overlap.
+    """
+
     serializer_class = TeacherAssignmentSerializer
-    filterset_fields = ["classroom", "teacher"]
+    filterset_class = TeacherAssignmentFilter
     ordering_fields = ["start_date"]
 
     def get_permissions(self):
@@ -78,18 +96,8 @@ class TeacherAssignmentViewSet(viewsets.ModelViewSet):
         return [IsEducationOfficer()]
 
     def get_queryset(self):
-        qs = TeacherAssignment.objects.select_related("teacher", "classroom")
+        qs = TeacherAssignment.objects.select_related("teacher", "classroom", "classroom__school")
         user = self.request.user
         if user.is_teacher:
             return qs.filter(teacher=user)
         return qs
-
-    def perform_create(self, serializer):
-        obj = serializer.save()
-        obj.full_clean()
-        obj.save()
-
-    def perform_update(self, serializer):
-        obj = serializer.save()
-        obj.full_clean()
-        obj.save()
