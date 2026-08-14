@@ -9,9 +9,6 @@ All dates in the system use the Gregorian calendar (ISO `YYYY-MM-DD` format).
 ## Phase 1 Status
 **Completed**
 
-## Phase 2 Status
-**Completed**
-
 ### Implemented in Phase 1
 
 * Role-based authentication (JWT)
