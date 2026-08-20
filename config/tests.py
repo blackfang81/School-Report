@@ -91,6 +91,18 @@ class DateTimeUtilsTest(TestCase):
         late = deadline + __import__("datetime").timedelta(seconds=1)
         self.assertFalse(is_salary_eligible(session_date, late))
 
+    def test_payroll_period_for_calculation_date(self):
+        from config.datetime_utils import payroll_period_for_calculation_date
+
+        self.assertEqual(
+            payroll_period_for_calculation_date(date(2026, 9, 15)),
+            (date(2026, 8, 16), date(2026, 9, 14)),
+        )
+        self.assertEqual(
+            payroll_period_for_calculation_date(date(2026, 1, 15)),
+            (date(2025, 12, 16), date(2026, 1, 14)),
+        )
+
 
 class ExceptionHandlerTest(TestCase):
     """Tests for structured error responses."""
@@ -115,6 +127,35 @@ class ExceptionHandlerTest(TestCase):
     def test_validation_error_with_code_class(self):
         exc = ValidationErrorWithCode("custom message", code="custom_code")
         self.assertEqual(exc.default_code, "custom_code")
+
+
+class ProjectClockTest(TestCase):
+    """Tests for virtual project clock override."""
+
+    def tearDown(self):
+        from config.project_clock import set_override
+
+        set_override(None)
+
+    def test_project_now_uses_override(self):
+        from django.utils import timezone
+
+        from config.project_clock import project_now, set_override
+
+        fake = timezone.make_aware(datetime(2026, 5, 10, 12, 0, 0))
+        set_override(fake)
+        self.assertEqual(project_now(), fake)
+
+    def test_reset_override(self):
+        from django.utils import timezone
+
+        from config.project_clock import get_override, project_now, set_override
+
+        fake = timezone.make_aware(datetime(2026, 5, 10, 12, 0, 0))
+        set_override(fake)
+        set_override(None)
+        self.assertIsNone(get_override())
+        self.assertNotEqual(project_now(), fake)
 
 
 class SoftDeleteCascadeBehaviourTest(TestCase):
