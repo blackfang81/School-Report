@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from config.project_clock import project_localdate
 from reports.models import ReportStatus, SessionReport
 
 
@@ -8,6 +9,7 @@ class SessionReportSerializer(serializers.ModelSerializer):
     classroom_name = serializers.CharField(source="classroom.name", read_only=True)
     teacher_name = serializers.CharField(source="teacher.get_full_name", read_only=True)
     school_name = serializers.CharField(source="classroom.school.name", read_only=True)
+    term_name = serializers.CharField(source="classroom.term.name", read_only=True)
 
     class Meta:
         model = SessionReport
@@ -16,6 +18,8 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "classroom",
             "classroom_name",
             "school_name",
+            "term_name",
+            "class_session",
             "teacher",
             "teacher_name",
             "session_date",
@@ -35,6 +39,7 @@ class SessionReportSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "teacher",
+            "session_date",
             "session_number",
             "status",
             "status_display",
@@ -47,6 +52,7 @@ class SessionReportSerializer(serializers.ModelSerializer):
             "teacher_name",
             "classroom_name",
             "school_name",
+            "term_name",
         )
 
 
@@ -55,7 +61,7 @@ class SessionReportCreateSerializer(serializers.ModelSerializer):
         model = SessionReport
         fields = (
             "classroom",
-            "session_date",
+            "class_session",
             "summary",
             "present_count",
             "absent_count",
@@ -65,10 +71,22 @@ class SessionReportCreateSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         teacher = request.user
         classroom = attrs["classroom"]
-        session_date = attrs["session_date"]
+        class_session = attrs["class_session"]
 
-        if not SessionReport.teacher_owns_class_on_date(teacher, classroom, session_date):
-            raise serializers.ValidationError("You are not assigned to this class on the selected date.")
+        if class_session.classroom_id != classroom.id:
+            raise serializers.ValidationError(
+                {"class_session": "Selected session does not belong to this class."}
+            )
+
+        try:
+            SessionReport.validate_class_session_for_teacher(teacher, class_session)
+        except ValueError as exc:
+            raise serializers.ValidationError({"class_session": str(exc)}) from exc
+
+        if class_session.session_date > project_localdate():
+            raise serializers.ValidationError(
+                {"class_session": "You can submit a report only after the session date."}
+            )
 
         if attrs["present_count"] + attrs["absent_count"] == 0:
             raise serializers.ValidationError("Present and absent counts must add up to more than zero.")
@@ -80,7 +98,6 @@ class SessionReportUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionReport
         fields = (
-            "session_date",
             "summary",
             "present_count",
             "absent_count",
@@ -91,13 +108,6 @@ class SessionReportUpdateSerializer(serializers.ModelSerializer):
         if instance.status == ReportStatus.APPROVED:
             raise serializers.ValidationError("Approved reports cannot be edited.")
 
-        teacher = self.context["request"].user
-        session_date = attrs.get("session_date", instance.session_date)
-        classroom = instance.classroom
-
-        if not SessionReport.teacher_owns_class_on_date(teacher, classroom, session_date):
-            raise serializers.ValidationError("You are not assigned to this class on the selected date.")
-
         present = attrs.get("present_count", instance.present_count)
         absent = attrs.get("absent_count", instance.absent_count)
         if present + absent == 0:
@@ -106,5 +116,29 @@ class SessionReportUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ReportReviewSerializer(serializers.Serializer):
-    note = serializers.CharField(required=False, allow_blank=True, default="")
+class ReportRejectSerializer(serializers.Serializer):
+    note = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_note(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Rejection reason is required.")
+        return value.strip()
+
+
+class TeacherSessionRosterSerializer(serializers.Serializer):
+    class_session_id = serializers.IntegerField()
+    classroom_id = serializers.IntegerField()
+    classroom_name = serializers.CharField()
+    school_name = serializers.CharField()
+    term_name = serializers.CharField()
+    session_number = serializers.IntegerField()
+    session_date = serializers.DateField()
+    weekday = serializers.CharField()
+    session_duration = serializers.IntegerField()
+    session_status = serializers.CharField()
+    can_submit = serializers.BooleanField()
+    can_edit = serializers.BooleanField()
+    report_id = serializers.IntegerField(allow_null=True)
+    report_status = serializers.CharField(allow_null=True)
+    is_salary_eligible = serializers.BooleanField(allow_null=True)
+    officer_note = serializers.CharField(allow_blank=True)
