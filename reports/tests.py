@@ -12,7 +12,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import Role, User
 from education.models import ClassRoom, School, TeacherAssignment, Term
+from education.test_helpers import create_classroom_with_session_dates
 from reports.models import ReportStatus, SessionReport
+from reports.test_helpers import create_report_for_session
 
 
 class SessionReportModelTest(TestCase):
@@ -109,7 +111,7 @@ class SessionReportModelTest(TestCase):
             timezone.datetime.combine(session_date, timezone.datetime.min.time())
             + timedelta(hours=24)
         )
-        with patch("django.utils.timezone.now", return_value=on_time):
+        with patch("reports.models.project_now", return_value=on_time):
             report.mark_approved()
         report.refresh_from_db()
         self.assertEqual(report.status, ReportStatus.APPROVED)
@@ -179,7 +181,7 @@ class SessionReportModelTest(TestCase):
             timezone.datetime.combine(session_date, timezone.datetime.min.time())
             + timedelta(hours=49)
         )
-        with patch("django.utils.timezone.now", return_value=late_time):
+        with patch("reports.models.project_now", return_value=late_time):
             report.mark_approved()
         self.assertFalse(report.is_salary_eligible)
 
@@ -206,28 +208,25 @@ class SessionReportAPITest(APITestCase):
             start_date=date(2026, 1, 1),
             end_date=date(2026, 12, 31),
         )
-        self.classroom = ClassRoom.objects.create(
+        self.classroom = create_classroom_with_session_dates(
             school=school,
             term=self.term,
-            name="Class",
-            session_duration=90,
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
-        )
-        TeacherAssignment.objects.create(
-            classroom=self.classroom,
             teacher=self.teacher,
-            start_date=date(2026, 1, 1),
+            session_dates=[date(2026, 1, 15), date(2026, 2, 15)],
+            name="Class",
         )
+        self.session = self.classroom.sessions.order_by("session_number").first()
+        self.second_session = self.classroom.sessions.order_by("session_number").last()
 
     def auth(self, user):
         token = RefreshToken.for_user(user).access_token
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
     def _create_report(self, **kwargs):
+        session = kwargs.pop("class_session", self.session)
         defaults = {
             "classroom": self.classroom.id,
-            "session_date": "2026-01-15",
+            "class_session": session.id,
             "summary": "Session summary",
             "present_count": 10,
             "absent_count": 2,
@@ -243,21 +242,65 @@ class SessionReportAPITest(APITestCase):
         self.assertEqual(response.data["status"], ReportStatus.PENDING)
         self.assertEqual(response.data["teacher"], self.teacher.id)
 
+    def test_my_sessions_lists_assigned_sessions(self):
+        self.auth(self.teacher)
+        response = self.client.get(reverse("report-my-sessions"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["session_number"], 1)
+
+    def test_my_sessions_marks_upcoming_sessions(self):
+        self.auth(self.teacher)
+        with patch("reports.services.project_localdate", return_value=date(2026, 1, 20)):
+            response = self.client.get(reverse("report-my-sessions"))
+        by_number = {item["session_number"]: item for item in response.data}
+        self.assertEqual(by_number[1]["session_status"], "ready")
+        self.assertTrue(by_number[1]["can_submit"])
+        self.assertEqual(by_number[2]["session_status"], "upcoming")
+        self.assertFalse(by_number[2]["can_submit"])
+
+    def test_my_sessions_includes_salary_eligibility_when_approved(self):
+        create_response = self._create_report()
+        report_id = create_response.data["id"]
+        self.auth(self.officer)
+        with patch("reports.models.project_now", return_value=timezone.make_aware(
+            timezone.datetime.combine(date(2026, 1, 16), timezone.datetime.min.time())
+        )):
+            approve_response = self.client.post(
+                reverse("report-approve", args=[report_id]),
+                {"note": ""},
+                format="json",
+            )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+        self.auth(self.teacher)
+        with patch("reports.services.project_localdate", return_value=date(2026, 1, 20)):
+            response = self.client.get(reverse("report-my-sessions"))
+        session_one = next(item for item in response.data if item["session_number"] == 1)
+        self.assertEqual(session_one["report_status"], ReportStatus.APPROVED)
+        self.assertTrue(session_one["is_salary_eligible"])
+        session_two = next(item for item in response.data if item["session_number"] == 2)
+        self.assertIsNone(session_two["is_salary_eligible"])
+
+    def test_create_report_for_future_session_fails(self):
+        with patch("reports.serializers.project_localdate", return_value=date(2026, 1, 10)):
+            response = self._create_report(class_session=self.session)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_create_report_unassigned_class_fails(self):
-        other_class = ClassRoom.objects.create(
+        other_class = create_classroom_with_session_dates(
             school=self.classroom.school,
             term=self.term,
+            session_dates=[date(2026, 1, 20)],
             name="Other",
             session_duration=60,
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
         )
+        other_session = other_class.sessions.first()
         self.auth(self.teacher)
         response = self.client.post(
             reverse("report-list"),
             {
                 "classroom": other_class.id,
-                "session_date": "2026-01-15",
+                "class_session": other_session.id,
                 "summary": "s",
                 "present_count": 5,
                 "absent_count": 1,
@@ -276,7 +319,7 @@ class SessionReportAPITest(APITestCase):
             reverse("report-list"),
             {
                 "classroom": self.classroom.id,
-                "session_date": "2026-01-15",
+                "class_session": self.session.id,
                 "summary": "s",
                 "present_count": 5,
                 "absent_count": 1,
@@ -287,11 +330,10 @@ class SessionReportAPITest(APITestCase):
 
     def test_teacher_sees_only_own_reports(self):
         self._create_report()
-        SessionReport.objects.create(
-            classroom=self.classroom,
-            teacher=self.teacher2,
-            session_date=date(2026, 1, 20),
-            session_number=2,
+        second = self.classroom.sessions.order_by("session_number")[1]
+        create_report_for_session(
+            second,
+            self.teacher2,
             summary="other",
             present_count=5,
             absent_count=1,
@@ -324,13 +366,13 @@ class SessionReportAPITest(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_officer_filters_by_date_range(self):
-        self._create_report(session_date="2026-01-15")
+        self._create_report()
         self.auth(self.teacher)
         self.client.post(
             reverse("report-list"),
             {
                 "classroom": self.classroom.id,
-                "session_date": "2026-02-15",
+                "class_session": self.second_session.id,
                 "summary": "second",
                 "present_count": 8,
                 "absent_count": 1,
@@ -350,12 +392,12 @@ class SessionReportAPITest(APITestCase):
         self.auth(self.officer)
         response = self.client.post(
             reverse("report-approve", args=[report_id]),
-            {"note": "Good job"},
+            {},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], ReportStatus.APPROVED)
-        self.assertEqual(response.data["officer_note"], "Good job")
+        self.assertEqual(response.data["officer_note"], "")
 
     def test_reject_report(self):
         create_resp = self._create_report()
@@ -368,6 +410,33 @@ class SessionReportAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], ReportStatus.REJECTED)
+
+    def test_reject_report_requires_reason(self):
+        create_resp = self._create_report()
+        report_id = create_resp.data["id"]
+        self.auth(self.officer)
+        response = self.client.post(reverse("report-reject", args=[report_id]), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_late_approval_via_api_not_salary_eligible(self):
+        create_resp = self._create_report()
+        report_id = create_resp.data["id"]
+        self.auth(self.officer)
+        session_date = date(2026, 1, 15)
+        late_time = timezone.make_aware(
+            timezone.datetime.combine(session_date, timezone.datetime.min.time())
+            + timedelta(hours=49)
+        )
+        with patch("reports.models.project_now", return_value=late_time):
+            response = self.client.post(reverse("report-approve", args=[report_id]), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_salary_eligible"])
+
+    def test_officer_filters_by_term(self):
+        self._create_report()
+        self.auth(self.officer)
+        response = self.client.get(reverse("report-list"), {"term": self.term.id})
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_teacher_cannot_approve(self):
         create_resp = self._create_report()
