@@ -2,7 +2,20 @@
 
 import django_filters
 
-from education.models import ClassRoom, TeacherAssignment
+from education.models import ClassRoom, TeacherAssignment, Term
+
+
+class TermFilter(django_filters.FilterSet):
+    """Filter terms by name, summer flag, and date range."""
+
+    start_date_from = django_filters.DateFilter(field_name="start_date", lookup_expr="gte")
+    start_date_to = django_filters.DateFilter(field_name="start_date", lookup_expr="lte")
+    end_date_from = django_filters.DateFilter(field_name="end_date", lookup_expr="gte")
+    end_date_to = django_filters.DateFilter(field_name="end_date", lookup_expr="lte")
+
+    class Meta:
+        model = Term
+        fields = ["is_summer", "name"]
 
 
 class ClassRoomFilter(django_filters.FilterSet):
