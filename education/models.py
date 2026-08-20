@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from accounts.models import Role, User
 from config.mixins import SoftDeleteModel
+from education.session_utils import build_session_plan
 
 
 class SessionDuration(models.IntegerChoices):
@@ -15,6 +16,18 @@ class SessionDuration(models.IntegerChoices):
     MIN_60 = 60, "60 minutes"
     MIN_90 = 90, "90 minutes"
     MIN_120 = 120, "120 minutes"
+
+
+class Weekday(models.IntegerChoices):
+    """Weekdays using Python's ``date.weekday()`` convention."""
+
+    MONDAY = 0, "Monday"
+    TUESDAY = 1, "Tuesday"
+    WEDNESDAY = 2, "Wednesday"
+    THURSDAY = 3, "Thursday"
+    FRIDAY = 4, "Friday"
+    SATURDAY = 5, "Saturday"
+    SUNDAY = 6, "Sunday"
 
 
 class School(SoftDeleteModel):
@@ -30,6 +43,13 @@ class School(SoftDeleteModel):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["phone"],
+                condition=Q(is_deleted=False) & ~Q(phone=""),
+                name="unique_active_school_phone",
+            )
+        ]
 
     def __str__(self):
         return self.name
