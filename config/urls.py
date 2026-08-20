@@ -12,8 +12,15 @@ from accounts.views import (
     RoleCheckView,
     TeacherListView,
 )
-from education.views import ClassRoomViewSet, SchoolViewSet, TeacherAssignmentViewSet, TermViewSet
+from education.views import (
+    ClassRoomViewSet,
+    ClassSessionViewSet,
+    SchoolViewSet,
+    TeacherAssignmentViewSet,
+    TermViewSet,
+)
 from finance.views import CalculateSalariesView, SalaryViewSet, TermBaseRateViewSet
+from config.views import ProjectClockView
 from frontend.views import IndexView
 from reports.views import SessionReportViewSet
 
@@ -21,6 +28,7 @@ router = DefaultRouter()
 router.register("schools", SchoolViewSet, basename="school")
 router.register("terms", TermViewSet, basename="term")
 router.register("classes", ClassRoomViewSet, basename="class")
+router.register("class-sessions", ClassSessionViewSet, basename="class-session")
 router.register("teacher-assignments", TeacherAssignmentViewSet, basename="teacher-assignment")
 router.register("reports", SessionReportViewSet, basename="report")
 router.register("finance/base-rates", TermBaseRateViewSet, basename="base-rate")
@@ -38,6 +46,7 @@ urlpatterns = [
     path("api/auth/users/", AdminCreateUserView.as_view(), name="admin_create_user"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/dev/clock/", ProjectClockView.as_view(), name="project_clock"),
     path("api/finance/salaries/calculate/", CalculateSalariesView.as_view(), name="calculate_salaries"),
     path("api/", include(router.urls)),
 ]
