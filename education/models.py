@@ -207,7 +207,7 @@ class ClassRoom(SoftDeleteModel):
         Defaults to today when no date is provided.
         """
         if target_date is None:
-            target_date = timezone.localdate()
+            target_date = project_localdate()
         for assignment in self.assignments.select_related("teacher").order_by("-start_date"):
             if assignment.is_active_on(target_date):
                 return assignment
@@ -222,7 +222,7 @@ class ClassRoom(SoftDeleteModel):
         finished classes to the most recent one.
         """
         if target_date is None:
-            target_date = timezone.localdate()
+            target_date = project_localdate()
         assignments = list(self.assignments.select_related("teacher").order_by("start_date"))
         if not assignments:
             return None
@@ -299,3 +299,57 @@ class TeacherAssignment(SoftDeleteModel):
         if target_date > effective_end:
             return False
         return True
+
+
+class ClassRoomWeekday(SoftDeleteModel):
+    """A weekday on which a class meets during its date range."""
+
+    classroom = models.ForeignKey(
+        ClassRoom, on_delete=models.CASCADE, related_name="weekdays"
+    )
+    weekday = models.IntegerField(choices=Weekday.choices)
+
+    class Meta:
+        ordering = ["weekday"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["classroom", "weekday"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_weekday_per_classroom",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.classroom.name} - {self.get_weekday_display()}"
+
+
+class ClassSession(SoftDeleteModel):
+    """A scheduled session slot generated from a class weekly pattern."""
+
+    classroom = models.ForeignKey(
+        ClassRoom, on_delete=models.CASCADE, related_name="sessions"
+    )
+    session_number = models.PositiveIntegerField()
+    session_date = models.DateField()
+
+    class Meta:
+        ordering = ["session_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["classroom", "session_number"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_class_session_number",
+            ),
+            models.UniqueConstraint(
+                fields=["classroom", "session_date"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_class_session_date",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.classroom.name} - Session {self.session_number}"
+
+    @property
+    def has_report(self):
+        return self.reports.filter(is_deleted=False).exists()
