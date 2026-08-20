@@ -54,6 +54,17 @@ class School(SoftDeleteModel):
     def __str__(self):
         return self.name
 
+    def clean(self):
+        phone = (self.phone or "").strip()
+        if not phone:
+            return
+
+        duplicate = School.all_objects.filter(phone=phone, is_deleted=False)
+        if self.pk:
+            duplicate = duplicate.exclude(pk=self.pk)
+        if duplicate.exists():
+            raise ValidationError({"phone": "Another school already uses this phone number."})
+
 
 class Term(SoftDeleteModel):
     """An academic term with a non-overlapping date range."""
