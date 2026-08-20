@@ -7,11 +7,13 @@ from accounts.permissions import IsEducationOfficer, IsTeacher
 from config.viewsets import SoftDeleteModelViewSetMixin
 from reports.models import ReportStatus, SessionReport
 from reports.serializers import (
-    ReportReviewSerializer,
+    ReportRejectSerializer,
     SessionReportCreateSerializer,
     SessionReportSerializer,
     SessionReportUpdateSerializer,
+    TeacherSessionRosterSerializer,
 )
+from reports.services import get_teacher_session_roster
 
 
 class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
@@ -23,7 +25,13 @@ class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
     Teachers may soft-delete only their own pending reports.
     """
 
-    filterset_fields = ["classroom", "teacher", "status", "classroom__school"]
+    filterset_fields = [
+        "classroom",
+        "teacher",
+        "status",
+        "classroom__school",
+        "classroom__term",
+    ]
     ordering_fields = ["session_date", "submitted_at", "session_number"]
 
     def get_permissions(self):
@@ -31,13 +39,19 @@ class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
             return [IsTeacher()]
         if self.action in ("approve", "reject"):
             return [IsEducationOfficer()]
+        if self.action == "my_sessions":
+            return [IsTeacher()]
         if self.action == "destroy":
             return [IsAuthenticated()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
         qs = SessionReport.objects.select_related(
-            "classroom", "classroom__school", "teacher"
+            "classroom",
+            "classroom__school",
+            "classroom__term",
+            "teacher",
+            "class_session",
         )
         user = self.request.user
         params = self.request.query_params
@@ -51,6 +65,8 @@ class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
                 qs = qs.filter(classroom_id=classroom)
             if teacher := params.get("teacher"):
                 qs = qs.filter(teacher_id=teacher)
+            if term := params.get("term"):
+                qs = qs.filter(classroom__term_id=term)
             if date_from := params.get("date_from"):
                 qs = qs.filter(session_date__gte=date_from)
             if date_to := params.get("date_to"):
@@ -70,11 +86,13 @@ class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
         serializer = SessionReportCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         classroom = serializer.validated_data["classroom"]
+        class_session = serializer.validated_data["class_session"]
         report = SessionReport.objects.create(
             classroom=classroom,
+            class_session=class_session,
             teacher=request.user,
-            session_date=serializer.validated_data["session_date"],
-            session_number=SessionReport.next_session_number(classroom),
+            session_date=class_session.session_date,
+            session_number=class_session.session_number,
             summary=serializer.validated_data["summary"],
             present_count=serializer.validated_data["present_count"],
             absent_count=serializer.validated_data["absent_count"],
@@ -116,21 +134,26 @@ class SessionReportViewSet(SoftDeleteModelViewSetMixin, viewsets.ModelViewSet):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    @action(detail=False, methods=["get"], url_path="my-sessions")
+    def my_sessions(self, request):
+        """List all assigned class sessions for the teacher with report status."""
+        roster = get_teacher_session_roster(request.user)
+        serializer = TeacherSessionRosterSerializer(roster, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
-        """Approve a pending report; sets salary eligibility based on 48-hour deadline."""
+        """Approve a pending report; clears any previous rejection note."""
         report = self.get_object()
-        serializer = ReportReviewSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        report.officer_note = serializer.validated_data.get("note", "")
+        report.officer_note = ""
         report.mark_approved()
         return Response(SessionReportSerializer(report).data)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
-        """Reject a report with an optional officer note."""
+        """Reject a report; rejection reason is required."""
         report = self.get_object()
-        serializer = ReportReviewSerializer(data=request.data)
+        serializer = ReportRejectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        report.mark_rejected(serializer.validated_data.get("note", ""))
+        report.mark_rejected(serializer.validated_data["note"])
         return Response(SessionReportSerializer(report).data)
