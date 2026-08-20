@@ -1,10 +1,11 @@
 """Serializers for education API resources."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.utils import timezone
+from config.project_clock import project_localdate
+from education.session_helpers import ensure_classroom_sessions
 from rest_framework import serializers
 
-from education.models import ClassRoom, School, TeacherAssignment, Term
+from education.models import ClassRoom, ClassSession, School, TeacherAssignment, Term, Weekday
 
 
 def _raise_validation_error(exc):
@@ -34,6 +35,16 @@ class SchoolSerializer(serializers.ModelSerializer):
             "deleted_at",
         )
         read_only_fields = ("is_deleted", "deleted_at")
+
+    def validate(self, attrs):
+        instance = self.instance or School()
+        for key, value in attrs.items():
+            setattr(instance, key, value)
+        try:
+            instance.full_clean()
+        except DjangoValidationError as exc:
+            _raise_validation_error(exc)
+        return attrs
 
 
 class TermSerializer(serializers.ModelSerializer):
@@ -79,6 +90,14 @@ class ClassRoomSerializer(serializers.ModelSerializer):
         source="get_session_duration_display", read_only=True
     )
     current_teacher = serializers.SerializerMethodField()
+    weekdays = serializers.ListField(
+        child=serializers.ChoiceField(choices=Weekday.choices),
+        required=False,
+        allow_empty=False,
+        write_only=True,
+    )
+    weekday_list = serializers.SerializerMethodField(read_only=True)
+    expected_session_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ClassRoom
@@ -94,11 +113,20 @@ class ClassRoomSerializer(serializers.ModelSerializer):
             "session_duration_display",
             "start_date",
             "end_date",
+            "weekdays",
+            "weekday_list",
+            "expected_session_count",
             "current_teacher",
             "is_deleted",
             "deleted_at",
         )
         read_only_fields = ("is_deleted", "deleted_at")
+
+    def get_weekday_list(self, obj):
+        return obj.get_weekdays()
+
+    def get_expected_session_count(self, obj):
+        return obj.sessions.filter(is_deleted=False).count()
 
     def get_current_teacher(self, obj):
         """Return the most relevant teacher assignment (active, upcoming, or last)."""
