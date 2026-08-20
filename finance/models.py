@@ -16,11 +16,27 @@ class SalaryRecord(models.Model):
     year = models.PositiveIntegerField()
     month = models.PositiveIntegerField()
     amount = models.DecimalField(max_digits=14, decimal_places=0)
+    calculation_date = models.DateField(null=True, blank=True)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
     calculated_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("teacher", "year", "month")
-        ordering = ["-year", "-month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("teacher", "year", "month"),
+                condition=models.Q(calculation_date__isnull=True),
+                name="unique_teacher_calendar_month",
+            ),
+            models.UniqueConstraint(
+                fields=("teacher", "calculation_date"),
+                condition=models.Q(calculation_date__isnull=False),
+                name="unique_teacher_calculation_date",
+            ),
+        ]
+        ordering = ["-calculation_date", "-year", "-month"]
 
     def __str__(self):
+        if self.calculation_date:
+            return f"{self.teacher} - calc {self.calculation_date}"
         return f"{self.teacher} - {self.year}/{self.month:02d}"
