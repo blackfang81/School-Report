@@ -20,8 +20,8 @@ class EducationModelTest(TestCase):
         self.school = School.objects.create(name="School 1")
         self.term = Term.objects.create(
             name="Term 1",
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         self.teacher = User.objects.create_user(
             username="t1", password="pass12345", role=Role.TEACHER
@@ -32,12 +32,28 @@ class EducationModelTest(TestCase):
         with self.assertRaises(ValidationError):
             term.full_clean()
 
+    def test_term_start_must_be_first_of_month(self):
+        term = Term(name="Bad", start_date=date(2026, 1, 15), end_date=date(2026, 1, 31))
+        with self.assertRaises(ValidationError):
+            term.full_clean()
+
+    def test_term_end_must_be_last_of_month(self):
+        term = Term(name="Bad", start_date=date(2026, 1, 1), end_date=date(2026, 1, 15))
+        with self.assertRaises(ValidationError):
+            term.full_clean()
+
+    def test_school_duplicate_phone(self):
+        School.objects.create(name="School 2", phone="02112345678")
+        school = School(name="School 3", phone="02112345678")
+        with self.assertRaises(ValidationError):
+            school.full_clean()
+
     def test_term_overlap(self):
         with self.assertRaises(ValidationError):
             Term.objects.create(
                 name="Overlap",
                 start_date=date(2026, 10, 1),
-                end_date=date(2027, 1, 1),
+                end_date=date(2027, 1, 31),
             )
 
     def test_class_outside_term_dates(self):
@@ -58,14 +74,14 @@ class EducationModelTest(TestCase):
             term=self.term,
             name="Class A",
             session_duration=90,
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         t2 = User.objects.create_user(username="t2", password="pass12345", role=Role.TEACHER)
         TeacherAssignment.objects.create(
             classroom=classroom,
             teacher=self.teacher,
-            start_date=date(2026, 9, 23),
+            start_date=date(2026, 9, 1),
             end_date=date(2026, 10, 23),
         )
         assignment = TeacherAssignment(
@@ -83,14 +99,14 @@ class EducationModelTest(TestCase):
             term=self.term,
             name="Class A",
             session_duration=90,
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         t2 = User.objects.create_user(username="t2", password="pass12345", role=Role.TEACHER)
         TeacherAssignment.objects.create(
             classroom=classroom,
             teacher=self.teacher,
-            start_date=date(2026, 9, 23),
+            start_date=date(2026, 9, 1),
             end_date=date(2026, 10, 31),
         )
         assignment = TeacherAssignment(
@@ -109,13 +125,13 @@ class EducationModelTest(TestCase):
             term=self.term,
             name="Class A",
             session_duration=90,
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         assignment = TeacherAssignment.objects.create(
             classroom=classroom,
             teacher=self.teacher,
-            start_date=date(2026, 9, 23),
+            start_date=date(2026, 9, 1),
         )
         self.assertTrue(assignment.is_active_on(date(2027, 6, 21)))
         self.assertFalse(assignment.is_active_on(date(2027, 7, 1)))
@@ -148,21 +164,21 @@ class EducationAPITest(APITestCase):
         self.school = School.objects.create(name="School 1", phone="02111111111")
         self.term = Term.objects.create(
             name="Term 1",
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         self.classroom = ClassRoom.objects.create(
             school=self.school,
             term=self.term,
             name="Class A",
             session_duration=90,
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         TeacherAssignment.objects.create(
             classroom=self.classroom,
             teacher=self.teacher1,
-            start_date=date(2026, 9, 23),
+            start_date=date(2026, 9, 1),
         )
 
     def auth(self, user):
@@ -211,6 +227,32 @@ class EducationAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_update_term(self):
+        self.auth(self.officer)
+        response = self.client.patch(
+            reverse("term-detail", args=[self.term.id]),
+            {"name": "Updated Term"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.term.refresh_from_db()
+        self.assertEqual(self.term.name, "Updated Term")
+
+    def test_create_overlapping_term_returns_clear_message(self):
+        self.auth(self.officer)
+        response = self.client.post(
+            reverse("term-list"),
+            {
+                "name": "Overlap Term",
+                "start_date": "2026-10-01",
+                "end_date": "2027-01-31",
+                "is_summer": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("overlap", str(response.data.get("error_message", "")).lower())
+
     def test_create_overlapping_term_fails(self):
         self.auth(self.officer)
         response = self.client.post(
@@ -218,7 +260,7 @@ class EducationAPITest(APITestCase):
             {
                 "name": "Overlap Term",
                 "start_date": "2026-10-01",
-                "end_date": "2027-01-01",
+                "end_date": "2027-01-31",
                 "is_summer": False,
             },
             format="json",
@@ -234,8 +276,9 @@ class EducationAPITest(APITestCase):
                 "term": self.term.id,
                 "name": "Bad Class",
                 "session_duration": 45,
-                "start_date": "2026-09-23",
-                "end_date": "2027-06-21",
+                "start_date": "2026-09-01",
+                "end_date": "2027-06-30",
+                "weekdays": [6],
             },
             format="json",
         )
@@ -251,7 +294,8 @@ class EducationAPITest(APITestCase):
                 "name": "Bad Dates",
                 "session_duration": 90,
                 "start_date": "2026-08-01",
-                "end_date": "2027-06-21",
+                "end_date": "2027-06-30",
+                "weekdays": [6],
             },
             format="json",
         )
@@ -284,13 +328,13 @@ class EducationAPITest(APITestCase):
             term=self.term,
             name="Class B",
             session_duration=60,
-            start_date=date(2026, 9, 23),
-            end_date=date(2027, 6, 21),
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 6, 30),
         )
         TeacherAssignment.objects.create(
             classroom=other_class,
             teacher=self.teacher2,
-            start_date=date(2026, 9, 23),
+            start_date=date(2026, 9, 1),
         )
 
         self.auth(self.teacher1)
@@ -314,7 +358,7 @@ class EducationAPITest(APITestCase):
             {
                 "classroom": self.classroom.id,
                 "teacher": self.teacher2.id,
-                "start_date": "2026-09-23",
+                "start_date": "2026-09-01",
                 "end_date": "2026-12-31",
             },
             format="json",
@@ -339,7 +383,7 @@ class EducationAPITest(APITestCase):
                 "classroom": self.classroom.id,
                 "teacher": self.teacher2.id,
                 "start_date": "2026-11-01",
-                "end_date": "2027-06-21",
+                "end_date": "2027-06-30",
             },
             format="json",
         )
@@ -353,7 +397,7 @@ class EducationAPITest(APITestCase):
             {
                 "classroom": self.classroom.id,
                 "teacher": self.teacher1.id,
-                "start_date": "2026-09-23",
+                "start_date": "2026-09-01",
             },
             format="json",
         )
@@ -369,7 +413,7 @@ class EducationAPITest(APITestCase):
             {
                 "classroom": self.classroom.id,
                 "teacher": finance.id,
-                "start_date": "2026-09-23",
+                "start_date": "2026-09-01",
             },
             format="json",
         )
