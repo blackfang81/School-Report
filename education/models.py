@@ -90,6 +90,16 @@ class Term(SoftDeleteModel):
         if self.end_date < self.start_date:
             raise ValidationError({"end_date": "End date cannot be before start date."})
 
+        if not is_first_day_of_month(self.start_date):
+            raise ValidationError(
+                {"start_date": "Term must start on the first day of a month."}
+            )
+
+        if not is_last_day_of_month(self.end_date):
+            raise ValidationError(
+                {"end_date": "Term must end on the last day of a month."}
+            )
+
         overlap = Term.all_objects.filter(
             is_deleted=False,
             start_date__lte=self.end_date,
