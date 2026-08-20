@@ -130,7 +130,7 @@ class ClassRoomSerializer(serializers.ModelSerializer):
 
     def get_current_teacher(self, obj):
         """Return the most relevant teacher assignment (active, upcoming, or last)."""
-        assignment = obj.get_current_assignment(timezone.localdate())
+        assignment = obj.get_current_assignment(project_localdate())
         if not assignment:
             return None
         return {
@@ -149,6 +149,8 @@ class ClassRoomSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         instance = self.instance or ClassRoom()
         for key, value in attrs.items():
+            if key == "weekdays":
+                continue
             setattr(instance, key, value)
         if "school" in attrs:
             instance.school = attrs["school"]
@@ -158,7 +160,72 @@ class ClassRoomSerializer(serializers.ModelSerializer):
             instance.full_clean()
         except DjangoValidationError as exc:
             _raise_validation_error(exc)
+
+        weekdays = attrs.get("weekdays")
+        if weekdays is not None and len(set(weekdays)) != len(weekdays):
+            raise serializers.ValidationError({"weekdays": "Duplicate weekdays are not allowed."})
+
+        if self.instance is None and weekdays is None:
+            raise serializers.ValidationError(
+                {"weekdays": "At least one weekly session day is required."}
+            )
+
         return attrs
+
+    def create(self, validated_data):
+        weekdays = validated_data.pop("weekdays")
+        classroom = ClassRoom.objects.create(**validated_data)
+        self._save_weekdays(classroom, weekdays)
+        classroom.regenerate_sessions()
+        return classroom
+
+    def update(self, instance, validated_data):
+        weekdays = validated_data.pop("weekdays", None)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+        if weekdays is not None:
+            self._save_weekdays(instance, weekdays)
+            instance.regenerate_sessions()
+        return instance
+
+    def _save_weekdays(self, classroom, weekdays):
+        from education.models import ClassRoomWeekday
+
+        unique_weekdays = sorted(set(weekdays))
+        existing = {
+            item.weekday: item
+            for item in ClassRoomWeekday.all_objects.filter(classroom=classroom)
+        }
+        for weekday in unique_weekdays:
+            item = existing.get(weekday)
+            if item and item.is_deleted:
+                item.restore()
+            elif not item:
+                ClassRoomWeekday.objects.create(classroom=classroom, weekday=weekday)
+
+        for weekday, item in existing.items():
+            if weekday not in unique_weekdays and not item.is_deleted:
+                item.delete()
+
+
+class ClassSessionSerializer(serializers.ModelSerializer):
+    """Read-only serializer for scheduled class sessions."""
+
+    has_report = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ClassSession
+        fields = (
+            "id",
+            "classroom",
+            "session_number",
+            "session_date",
+            "has_report",
+            "is_deleted",
+            "deleted_at",
+        )
+        read_only_fields = fields
 
 
 class TeacherAssignmentSerializer(serializers.ModelSerializer):
@@ -181,6 +248,16 @@ class TeacherAssignmentSerializer(serializers.ModelSerializer):
             "deleted_at",
         )
         read_only_fields = ("is_deleted", "deleted_at")
+
+    def create(self, validated_data):
+        assignment = super().create(validated_data)
+        ensure_classroom_sessions(assignment.classroom)
+        return assignment
+
+    def update(self, instance, validated_data):
+        assignment = super().update(instance, validated_data)
+        ensure_classroom_sessions(assignment.classroom)
+        return assignment
 
     def validate_teacher(self, value):
         if not value.is_teacher:
