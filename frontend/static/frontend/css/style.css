@@ -122,6 +122,50 @@ label {
   gap: 12px;
 }
 
+.form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.form-grid .checkbox-field {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.form-grid .checkbox-field label {
+  margin: 0;
+  display: inline;
+}
+
+.form-grid .checkbox-field input[type="checkbox"],
+.weekday-option input[type="checkbox"] {
+  width: auto;
+  margin: 0 6px 0 0;
+}
+
+.weekday-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.weekday-option {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+}
+
+.clock-banner {
+  font-size: 12px;
+  opacity: 0.9;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -162,6 +206,11 @@ th {
   color: #166534;
 }
 
+.alert.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;
@@ -180,6 +229,80 @@ th {
 
 .badge.pending {
   background: #fef3c7;
+}
+
+.badge.ready {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge.upcoming {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal.hidden {
+  display: none !important;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 24px;
+}
+
+.modal-card textarea {
+  width: 100%;
+  margin: 8px 0 16px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.modal-message {
+  margin: 0 0 16px;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modal-message.hidden,
+#report-action-note-wrap.hidden {
+  display: none !important;
+}
+
+.note-preview {
+  display: block;
+  max-width: 220px;
+  white-space: normal;
+  font-size: 13px;
+  color: #374151;
+}
+
+.note-empty {
+  color: #9ca3af;
 }
 
 @media (max-width: 768px) {

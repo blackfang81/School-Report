@@ -30,6 +30,7 @@
     <header>
       <strong>Class Reporting System</strong>
       <div class="user-info">
+        <span id="clock-banner" class="clock-banner hidden"></span>
         <span id="user-label"></span>
         <button id="logout-btn" class="secondary">Logout</button>
       </div>
@@ -43,7 +44,24 @@
     </div>
   </section>
 
-  <script src="{% static 'frontend/js/api.js' %}"></script>
-  <script src="{% static 'frontend/js/app.js' %}"></script>
+  <div id="report-action-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" onclick="closeReportActionModal()"></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <h3 id="report-action-title"></h3>
+      <p id="report-action-message" class="modal-message hidden"></p>
+      <div id="report-action-note-wrap">
+        <label id="report-action-label" for="report-action-note"></label>
+        <textarea id="report-action-note" rows="4"></textarea>
+      </div>
+      <div id="report-action-error" class="alert error hidden"></div>
+      <div class="actions">
+        <button id="report-action-submit" onclick="submitReportActionModal()"></button>
+        <button type="button" class="secondary" onclick="closeReportActionModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{% static 'frontend/js/api.js' %}?v=7"></script>
+  <script src="{% static 'frontend/js/app.js' %}?v=7"></script>
 </body>
 </html>
