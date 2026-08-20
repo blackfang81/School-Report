@@ -3,9 +3,10 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
-from django.utils import timezone
+from config.project_clock import project_localdate
 
 from accounts.models import Role, User
+from config.datetime_utils import is_first_day_of_month, is_last_day_of_month
 from config.mixins import SoftDeleteModel
 from education.session_utils import build_session_plan
 
@@ -86,7 +87,7 @@ class Term(SoftDeleteModel):
         return super().save(*args, **kwargs)
 
     def clean(self):
-        """Validate date order and ensure no overlap with other terms."""
+        """Validate date order, month boundaries, and ensure no overlap with other terms."""
         if self.end_date < self.start_date:
             raise ValidationError({"end_date": "End date cannot be before start date."})
 
@@ -142,6 +143,62 @@ class ClassRoom(SoftDeleteModel):
                 raise ValidationError(
                     {"end_date": "Class end date must be within the term date range."}
                 )
+
+    def get_weekdays(self):
+        """Return active weekday integers configured for this class."""
+        return list(
+            self.weekdays.filter(is_deleted=False)
+            .order_by("weekday")
+            .values_list("weekday", flat=True)
+        )
+
+    def regenerate_sessions(self):
+        """
+        Rebuild scheduled sessions from current dates and weekday pattern.
+
+        Sessions that already have reports are preserved; unreported sessions are replaced.
+        """
+        from education.models import ClassSession
+
+        weekdays = self.get_weekdays()
+        plan = build_session_plan(self.start_date, self.end_date, weekdays)
+
+        existing = {
+            session.session_number: session
+            for session in ClassSession.all_objects.filter(classroom=self, is_deleted=False)
+        }
+        reported_numbers = set(
+            self.reports.filter(is_deleted=False).values_list("session_number", flat=True)
+        )
+
+        planned_numbers = {number for number, _ in plan}
+        for number, session in existing.items():
+            if number in reported_numbers:
+                continue
+            if number not in planned_numbers:
+                session.delete()
+
+        for number, session_date in plan:
+            session = existing.get(number)
+            if number in reported_numbers and session:
+                if session.session_date != session_date:
+                    raise ValidationError(
+                        "Cannot change schedule for a session that already has a report."
+                    )
+                continue
+
+            if session:
+                if session.is_deleted:
+                    session.restore()
+                session.session_date = session_date
+                session.save(update_fields=["session_date"])
+                continue
+
+            ClassSession.objects.create(
+                classroom=self,
+                session_number=number,
+                session_date=session_date,
+            )
 
     def get_active_teacher(self, target_date=None):
         """
