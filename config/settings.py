@@ -92,6 +92,8 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+PROJECT_CLOCK_ENABLED = os.getenv("PROJECT_CLOCK_ENABLED", str(DEBUG)).lower() in ("1", "true", "yes")
+
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "frontend" / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
