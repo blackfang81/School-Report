@@ -39,8 +39,8 @@ class SessionReport(SoftDeleteModel):
         default=ReportStatus.PENDING,
     )
     officer_note = models.TextField(blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    submitted_at = models.DateTimeField(default=project_now)
+    updated_at = models.DateTimeField(default=project_now)
     approved_at = models.DateTimeField(null=True, blank=True)
     is_salary_eligible = models.BooleanField(default=False)
 
@@ -61,6 +61,20 @@ class SessionReport(SoftDeleteModel):
 
     def __str__(self):
         return f"Session {self.session_number} - {self.classroom.name}"
+
+    def save(self, *args, **kwargs):
+        now = project_now()
+        if self._state.adding:
+            self.submitted_at = now
+        self.updated_at = now
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            fields = set(update_fields)
+            fields.add("updated_at")
+            if self._state.adding:
+                fields.add("submitted_at")
+            kwargs["update_fields"] = fields
+        super().save(*args, **kwargs)
 
     @staticmethod
     def next_session_number(classroom):

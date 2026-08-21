@@ -1,6 +1,6 @@
 """Comprehensive tests for the reports app: models, API, soft delete, and workflow."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import Role, User
+from config.project_clock import set_override
 from education.models import ClassRoom, School, TeacherAssignment, Term
 from education.test_helpers import create_classroom_with_session_dates
 from reports.models import ReportStatus, SessionReport
@@ -117,6 +118,24 @@ class SessionReportModelTest(TestCase):
         self.assertEqual(report.status, ReportStatus.APPROVED)
         self.assertIsNotNone(report.approved_at)
         self.assertTrue(report.is_salary_eligible)
+
+    def test_create_uses_project_clock_for_submitted_at(self):
+        fake_now = timezone.make_aware(datetime(2026, 1, 20, 14, 30, 0))
+        set_override(fake_now)
+        try:
+            report = SessionReport.objects.create(
+                classroom=self.classroom,
+                teacher=self.teacher,
+                session_date=date(2026, 1, 15),
+                session_number=1,
+                summary="s",
+                present_count=5,
+                absent_count=1,
+            )
+            self.assertEqual(report.submitted_at, fake_now)
+            self.assertEqual(report.updated_at, fake_now)
+        finally:
+            set_override(None)
 
     def test_mark_rejected_clears_eligibility(self):
         report = SessionReport.objects.create(
@@ -241,6 +260,18 @@ class SessionReportAPITest(APITestCase):
         self.assertEqual(response.data["session_number"], 1)
         self.assertEqual(response.data["status"], ReportStatus.PENDING)
         self.assertEqual(response.data["teacher"], self.teacher.id)
+
+    def test_create_report_uses_project_clock_for_submitted_at(self):
+        fake_now = timezone.make_aware(datetime(2026, 1, 20, 14, 30, 0))
+        set_override(fake_now)
+        try:
+            response = self._create_report()
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            report = SessionReport.objects.get(pk=response.data["id"])
+            self.assertEqual(report.submitted_at, fake_now)
+            self.assertEqual(report.updated_at, fake_now)
+        finally:
+            set_override(None)
 
     def test_my_sessions_lists_assigned_sessions(self):
         self.auth(self.teacher)
