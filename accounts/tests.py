@@ -11,6 +11,8 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import Role, User
+from education.models import ClassRoom, ClassSession
+from finance.models import TermBaseRate
 
 
 class UserModelTest(TestCase):
@@ -110,7 +112,11 @@ class SeedDataCommandTest(TestCase):
         out1 = StringIO()
         call_command("seed_data", stdout=out1)
         self.assertTrue(User.objects.filter(username="teacher1").exists())
+        self.assertTrue(User.objects.filter(username="teacher2").exists())
         self.assertTrue(User.objects.filter(username="admin1").exists())
+        self.assertTrue(ClassRoom.objects.filter(name="Robotics").exists())
+        self.assertGreater(ClassSession.objects.filter(is_deleted=False).count(), 0)
+        self.assertEqual(TermBaseRate.objects.filter(is_deleted=False).count(), 2)
 
         out2 = StringIO()
         call_command("seed_data", stdout=out2)
