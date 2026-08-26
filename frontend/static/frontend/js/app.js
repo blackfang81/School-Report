@@ -174,10 +174,10 @@ async function renderNewReport() {
       pageContent.innerHTML = `
         <div class="card">
           <div class="alert error">
-            هیچ جلسه‌ای یافت نشد. مسئول آموزش باید:
+            No sessions found. The Education Officer must:
             <ol style="margin:8px 0 0 20px">
-              <li>کلاس را با روزهای هفتگی (Weekly Sessions) بسازد</li>
-              <li>شما را به آن کلاس assign کند</li>
+              <li>Create the class with weekly sessions (Weekly Sessions)</li>
+              <li>Assign you to that class</li>
             </ol>
           </div>
         </div>`;
@@ -192,22 +192,22 @@ async function renderNewReport() {
     if (readyCount === 0 && editCount === 0) {
       banner = `
         <div class="alert pending">
-          هنوز جلسه‌ای برای گزارش‌نویسی آماده نیست — فقط بعد از تاریخ برگزاری جلسه می‌توانید گزارش بنویسید.
+          No session is ready for reporting yet — you can only write a report after the session date.
           ${
             nextReady
-              ? `اولین جلسه: <strong>${formatDate(nextReady.session_date)}</strong> (${nextReady.classroom_name})`
+              ? `First session: <strong>${formatDate(nextReady.session_date)}</strong> (${nextReady.classroom_name})`
               : ""
           }
-          <br>برای تست، مسئول آموزش می‌تواند از منوی <strong>Timeline</strong> تاریخ پروژه را جلو ببرد.
+          <br>For testing, the Education Officer can advance the project date from the <strong>Timeline</strong> menu.
         </div>`;
     } else {
-      banner = `<div class="alert success">${readyCount} جلسه آماده گزارش${editCount ? ` · ${editCount} قابل ویرایش` : ""}</div>`;
+      banner = `<div class="alert success">${readyCount} sessions ready for reporting${editCount ? ` · ${editCount} editable` : ""}</div>`;
     }
 
     pageContent.innerHTML = `
       <div class="card">
         ${banner}
-        <p style="margin-bottom:0">لیست جلسات شما — روی <strong>Write Report</strong> بزنید:</p>
+        <p style="margin-bottom:0">Your sessions — click <strong>Write Report</strong>:</p>
       </div>
       <div id="teacher-session-list" style="margin-top:16px"></div>`;
 
@@ -259,7 +259,7 @@ async function renderNewReport() {
   } catch (error) {
     pageContent.innerHTML = `
       <div class="card">
-        <div class="alert error">خطا در بارگذاری جلسات: ${error.message}</div>
+        <div class="alert error">Error loading sessions: ${error.message}</div>
       </div>`;
   }
 }
@@ -838,12 +838,12 @@ async function renderCalculateSalaries() {
     <div class="card">
       <h3>Calculate Salaries</h3>
       <p style="color:#555;font-size:14px">
-        تاریخ محاسبه را انتخاب کنید. حقوق برای <strong>۳۰ روز قبل</strong> از آن تاریخ محاسبه می‌شود
-        (تا روز قبل از تاریخ محاسبه).
+        Select the calculation date. Salary is calculated for the <strong>30 days before</strong> that date
+        (up to the day before the calculation date).
         <br>
-        مثال: ۱۵ سپتامبر → بازه ۱۶ آگوست تا ۱۴ سپتامبر.
+        Example: September 15 → period from August 16 to September 14.
         <br>
-        شرط پرداخت: همه جلسات آن بازه تأیید شده باشند؛ فقط جلسات تأییدشده در ۴۸ ساعت حقوق می‌گیرند.
+        Payment condition: all sessions in the period must be approved; only sessions approved within 48 hours are paid.
       </p>
       <form id="calc-form" class="form-grid">
         <div><label>Calculation Date</label><input type="date" name="calculation_date" value="${today}" required></div>
